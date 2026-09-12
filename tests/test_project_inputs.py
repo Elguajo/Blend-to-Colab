@@ -6,6 +6,7 @@ import unittest
 
 from src.project_inputs import (
     ProjectInputError,
+    resolve_path_under,
     select_blend_file,
     validate_blend_file,
     validate_https_url,
@@ -43,6 +44,14 @@ class ProjectInputTests(unittest.TestCase):
             self.assertEqual(select_blend_file(root, "nested/second.blend"), expected)
             with self.assertRaises(ProjectInputError):
                 select_blend_file(root, "../first.blend")
+
+    def test_result_path_stays_inside_drive_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "MyDrive"
+            self.assertEqual(resolve_path_under(root, "Рендеры / final", field_name="DRIVE_RESULT_PATH"), root.resolve() / "Рендеры " / " final")
+            for value in ("../outside", "/outside", "C:\\outside"):
+                with self.assertRaises(ProjectInputError):
+                    resolve_path_under(root, value, field_name="DRIVE_RESULT_PATH")
 
     def test_notebook_embeds_all_project_sources_and_result_delivery(self) -> None:
         repository_root = Path(__file__).resolve().parents[1]

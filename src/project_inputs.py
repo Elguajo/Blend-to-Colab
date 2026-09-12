@@ -43,6 +43,22 @@ def validate_project_relative_path(value: str) -> PurePosixPath:
     return candidate
 
 
+def resolve_path_under(root: Path, relative_path: str, *, field_name: str) -> Path:
+    """Resolve a user-supplied relative path without allowing an escape from root."""
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        raise ProjectInputError(f"{field_name} must be a non-empty path inside its root.")
+    windows_path = PureWindowsPath(relative_path)
+    if windows_path.is_absolute() or windows_path.drive:
+        raise ProjectInputError(f"{field_name} must stay inside its root.")
+    base = Path(root).resolve()
+    candidate = (base / relative_path.strip()).resolve()
+    try:
+        candidate.relative_to(base)
+    except ValueError as error:
+        raise ProjectInputError(f"{field_name} must stay inside its root.") from error
+    return candidate
+
+
 def validate_blend_file(path: Path, *, max_bytes: int = MAX_PROJECT_FILE_BYTES) -> Path:
     candidate = Path(path)
     if candidate.is_symlink() or not candidate.is_file():
