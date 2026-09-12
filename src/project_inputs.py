@@ -83,7 +83,7 @@ def validate_blend_file(path: Path, *, max_bytes: int = MAX_PROJECT_FILE_BYTES) 
 def select_blend_file(project_root: Path, selected_path: str = "") -> Path:
     root = Path(project_root).resolve()
     candidates = tuple(sorted(path for path in root.rglob("*.blend") if path.is_file() and not path.is_symlink()))
-    if len(candidates) == 1 and not selected_path.strip():
+    if len(candidates) == 1:
         return candidates[0]
     if not selected_path.strip():
         choices = ", ".join(path.relative_to(root).as_posix() for path in candidates) or "none"

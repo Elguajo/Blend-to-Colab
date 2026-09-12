@@ -53,6 +53,12 @@ class ProjectInputTests(unittest.TestCase):
             with self.assertRaises(ProjectInputError):
                 select_blend_file(root, "../first.blend")
 
+    def test_stale_selection_does_not_block_a_single_blend_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            expected = self._blend(root / "scene.blend")
+            self.assertEqual(select_blend_file(root, "nested/previous.blend"), expected)
+
     def test_result_path_stays_inside_drive_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "MyDrive"
