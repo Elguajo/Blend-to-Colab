@@ -1,1 +1,3 @@
 .playwright-mcp/
+.serena/
+.DS_Store
