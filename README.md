@@ -12,6 +12,7 @@
 - Выбор точной версии Blender.
 - Загрузка одного `.blend` или ZIP-архива с проектом.
 - Автоматическая попытка использовать OptiX или CUDA для Cycles.
+- Read-only preflight сцены и внешних ресурсов до полного рендера.
 - Отдельная папка в Google Drive для каждого запуска.
 - Необязательное скачивание результата на локальный компьютер.
 
@@ -40,11 +41,18 @@
 
 | Параметр | Назначение | Значение по умолчанию |
 | --- | --- | --- |
-| `BLENDER_VERSION` | Версия Blender для установки. Она не должна быть старее версии, в которой сохранён проект. | `'4.2.0'` |
-| `ENABLE_CYCLES_GPU` | Пытаться включить GPU для сцен Cycles. | `True` |
+| `BLENDER_VERSION_PRESET` | Поддерживаемая LTS-версия Blender. | `'5.2.1'` |
+| `CUSTOM_BLENDER_VERSION` | Точная версия `X.Y.Z`, только если preset равен `'custom'`. | `''` |
+| `ENABLE_CYCLES_GPU` | Проверить и включить GPU для сцен Cycles через Blender/Cycles. | `True` |
+| `ALLOW_CPU_FALLBACK` | Разрешить CPU-рендер Cycles, если Blender не подтвердил GPU. | `False` |
+| `INCLUDE_CPU_WITH_GPU` | Использовать CPU вместе с выбранным GPU Cycles. | `False` |
 | `RENDER_MODE` | `'ANIMATION'` — весь диапазон кадров; `'STILL'` — один кадр. | `'ANIMATION'` |
 | `STILL_FRAME` | Номер кадра при `RENDER_MODE = 'STILL'`. | `1` |
 | `DOWNLOAD_RESULT` | Дополнительно скачать готовый файл или ZIP на компьютер. | `False` |
+| `RUN_CYCLES_SMOKE_TEST` | Выполнить отдельный реальный Cycles GPU smoke test до загрузки проекта. | `False` |
+| `RUN_PREFLIGHT_TEST_FRAME` | После preflight отрендерить один кадр для линейной оценки времени и места. | `False` |
+
+Ноутбук предлагает актуальные LTS-предустановки `5.2.1` и `4.5.13`; режим `custom` сохраняет возможность выбрать другую точную версию. Blender скачивается только из официального каталога `download.blender.org`, а архив проверяется по опубликованному SHA-256 до распаковки.
 
 Папка для результатов задаётся в ячейке подключения Drive:
 
@@ -66,18 +74,28 @@ DRIVE_OUTPUT_DIR = Path('/content/drive/MyDrive/Blender Renders')
 
 ## GPU и Cycles
 
-Для Cycles рекомендуется включить GPU в настройках среды Colab. Ноутбук по очереди пробует OptiX и CUDA; если подходящее GPU-устройство недоступно, Blender продолжит рендер на CPU с сохранёнными настройками проекта.
+Для Cycles рекомендуется включить GPU в настройках среды Colab. Ноутбук по очереди проверяет OptiX и CUDA через сам Blender/Cycles, включает только устройства выбранного backend и печатает их имена. Если Cycles-сцена не получила подтверждённый GPU, запуск останавливается по умолчанию: CPU fallback возможен только при явном `ALLOW_CPU_FALLBACK = True`.
+
+Чтобы проверить реальный runtime до загрузки проекта, установите `RUN_CYCLES_SMOKE_TEST = True` и выполните ячейку 2.1 в GPU-среде Colab. Она рендерит отдельную временную сцену Cycles 64×64 и сохраняет `/content/cycles_gpu_smoke_test.log` с маркером `CYCLES_SMOKE_TEST_PASS backend=...`; исходный `.blend` при этом не открывается.
 
 Для Eevee отдельная настройка `ENABLE_CYCLES_GPU` не требуется.
+
+## Preflight перед полным рендером
+
+После загрузки проекта ячейка **«4. Read-only preflight проекта (JSON)»** открывает его отдельным stock Blender background-процессом с `--factory-startup --disable-autoexec`. Она записывает `/content/blender_preflight/<имя-проекта>/preflight.json` и выводит его содержимое: сцены, камеры, движки, диапазоны кадров, output settings, textures, linked libraries, fonts, VDB, caches, включённые внешние add-ons, RAM/disk и доступную VRAM.
+
+До и после probe сверяется SHA-256 исходного `.blend`; при несовпадении notebook останавливается. Ошибки отсутствующих ресурсов, камеры, диапазона или неподдерживаемого движка видны до test-frame и полного рендера.
+
+`RUN_PREFLIGHT_TEST_FRAME = True` запускает один кадр только после preflight без ошибок. Он явно переопределяет лишь frame и output path для этого процесса, сохраняет измерение в `estimate.json` рядом с report и не сохраняет исходный `.blend`. Оценка линейная: сложность последующих кадров, GPU и startup Blender могут отличаться.
 
 ## Устранение неполадок
 
 | Проблема | Что проверить |
 | --- | --- |
-| Blender не открывает файл | Укажите версию `BLENDER_VERSION`, не старее версии сохранения `.blend`. |
+| Blender не открывает файл | Укажите `BLENDER_VERSION_PRESET` или `CUSTOM_BLENDER_VERSION`, не старее версии сохранения `.blend`. |
 | Текстуры или HDRI не найдены | Упакуйте ресурсы в Blender или загрузите ZIP с сохранённой структурой папок. |
 | Ноутбук сообщает, что найдено не один `.blend` | Загрузите только один `.blend` либо ZIP с единственным `.blend` внутри. |
-| Cycles рендерит на CPU | Включите GPU в настройках среды Colab; доступность OptiX/CUDA зависит от выделенного Colab оборудования. |
+| Cycles не запускается без GPU | Включите GPU в настройках среды Colab. Если CPU-рендер действительно нужен, установите `ALLOW_CPU_FALLBACK = True` явно. |
 | Результаты не появились в Drive | Убедитесь, что авторизация Google Drive была успешно завершена и у аккаунта есть место. |
 
 ## Структура репозитория
@@ -89,6 +107,9 @@ DRIVE_OUTPUT_DIR = Path('/content/drive/MyDrive/Blender Renders')
 │   ├── ANALOG_AUDIT.md             # аудит аналогов и план развития
 │   ├── BLENDER_ADDON_SPEC.md        # спецификация будущего Blender-аддона
 │   └── IMPLEMENTATION_ROADMAP.md    # поэтапная реализация и подтверждённый статус
+├── src/
+│   └── blend_to_colab.py            # тестируемые standard-library helpers notebook
+├── tests/                           # unit tests config/version/archive safety
 ├── render_blender_in_colab.ipynb  # ноутбук для Colab
 └── README.md                      # документация
 ```

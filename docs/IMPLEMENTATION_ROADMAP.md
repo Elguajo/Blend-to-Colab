@@ -1,6 +1,6 @@
 # ROADMAP — Blend-to-Colab
 
-Статус на 2026-09-12: подготовка завершена, реализация не начата.
+Статус на 2026-09-12: Этапы 1 и 2 завершены. Локальные unit/static checks и реальные Colab smoke tests подтверждены.
 
 Связанные документы:
 
@@ -28,14 +28,14 @@
 
 ## Этап 1 — correctness и safety notebook
 
-- [ ] Исправить обнаружение и выбор Cycles GPU backend.
-- [ ] Добавить явную политику CPU fallback без скрытого запуска на CPU.
-- [ ] Ввести типизированную конфигурацию и проверку пользовательских значений.
-- [ ] Реализовать безопасную распаковку ZIP с защитой от path traversal и archive bombs.
-- [ ] Загружать Blender только с официального источника и проверять SHA-256.
-- [ ] Обновить LTS presets, сохранив режим custom version.
-- [ ] Добавить unit tests для config, version resolution, URL construction и archive safety.
-- [ ] Провести реальный Cycles smoke test в Colab и сохранить подтверждающий лог.
+- [x] Исправить обнаружение и выбор Cycles GPU backend.
+- [x] Добавить явную политику CPU fallback без скрытого запуска на CPU.
+- [x] Ввести типизированную конфигурацию и проверку пользовательских значений.
+- [x] Реализовать безопасную распаковку ZIP с защитой от path traversal и archive bombs.
+- [x] Загружать Blender только с официального источника и проверять SHA-256.
+- [x] Обновить LTS presets, сохранив режим custom version.
+- [x] Добавить unit tests для config, version resolution, URL construction и archive safety.
+- [x] Провести реальный Cycles smoke test в Colab и сохранить подтверждающий лог: Blender 5.2.1 LTS, T4, OptiX, `Tesla T4 (OPTIX)`, маркер `CYCLES_SMOKE_TEST_PASS`.
 
 Риск-гейт: нельзя заявлять о GPU-рендере по одному `nvidia-smi`; backend и устройство должны быть подтверждены самим Blender/Cycles.
 
@@ -43,13 +43,13 @@
 
 ## Этап 2 — read-only preflight
 
-- [ ] Добавить Blender probe, возвращающий машиночитаемый JSON.
-- [ ] Проверять сцену, камеру, render engine, диапазон кадров и output settings.
-- [ ] Находить отсутствующие textures, linked libraries, fonts, VDB и caches.
-- [ ] Выявлять внешние add-ons и неподдерживаемые render engines.
-- [ ] Показывать RAM, disk, GPU и доступную VRAM.
-- [ ] Добавить test-frame и оценку времени/места перед полным рендером.
-- [ ] Подтвердить тестами, что probe не сохраняет и не изменяет `.blend`.
+- [x] Добавить Blender probe, возвращающий машиночитаемый JSON.
+- [x] Проверять сцену, камеру, render engine, диапазон кадров и output settings.
+- [x] Находить отсутствующие textures, linked libraries, fonts, VDB и caches.
+- [x] Выявлять внешние add-ons и неподдерживаемые render engines.
+- [x] Показывать RAM, disk, GPU и доступную VRAM.
+- [x] Добавить test-frame и оценку времени/места перед полным рендером.
+- [x] Подтвердить тестами, что probe не сохраняет и не изменяет `.blend`.
 
 Риск-гейт: исходная сцена и её dirty state не должны меняться от проверки.
 
@@ -188,4 +188,4 @@
 
 ## Текущий статус
 
-Этап 0 завершён. Следующий разрешённый к выполнению этап — **Этап 1: correctness и safety notebook**; реализация кода ещё не начиналась.
+Этапы 0, 1 и 2 завершены. Этап 1 подтверждён локальными проверками и реальным Colab GPU smoke test: Blender 5.2.1 LTS выбрал OptiX на `Tesla T4 (OPTIX)` и завершил рендер временной сцены с маркером `CYCLES_SMOKE_TEST_PASS`. Этап 2 подтверждён реальным Colab T4 smoke test: stock Blender 5.2.1 сохранил SHA-256 двух временных `.blend` до и после probe, обнаружил `missing_asset` до рендера и отрендерил opt-in test-frame за 1.33 с; Cycles обнаружил CUDA и OptiX для Tesla T4.
