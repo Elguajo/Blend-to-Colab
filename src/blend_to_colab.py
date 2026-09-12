@@ -40,6 +40,10 @@ class BlenderDownloadError(RuntimeError):
     """An official Blender archive or its checksum could not be verified."""
 
 
+class BlenderCacheError(BlenderDownloadError):
+    """A Blender archive cache entry is malformed or cannot be trusted."""
+
+
 class BlenderProbeError(RuntimeError):
     """A Blender preflight report is missing, malformed, or unsafe to trust."""
 
@@ -98,6 +102,7 @@ class RenderConfig:
     download_result: bool
     run_cycles_smoke_test: bool
     run_preflight_test_frame: bool
+    enable_drive_blender_cache: bool
 
     @classmethod
     def from_user_values(
@@ -113,6 +118,7 @@ class RenderConfig:
         download_result: bool,
         run_cycles_smoke_test: bool,
         run_preflight_test_frame: bool,
+        enable_drive_blender_cache: bool = False,
     ) -> "RenderConfig":
         boolean_values = {
             "ENABLE_CYCLES_GPU": enable_cycles_gpu,
@@ -121,6 +127,7 @@ class RenderConfig:
             "DOWNLOAD_RESULT": download_result,
             "RUN_CYCLES_SMOKE_TEST": run_cycles_smoke_test,
             "RUN_PREFLIGHT_TEST_FRAME": run_preflight_test_frame,
+            "ENABLE_DRIVE_BLENDER_CACHE": enable_drive_blender_cache,
         }
         for name, value in boolean_values.items():
             if not isinstance(value, bool):
@@ -145,6 +152,7 @@ class RenderConfig:
             download_result=download_result,
             run_cycles_smoke_test=run_cycles_smoke_test,
             run_preflight_test_frame=run_preflight_test_frame,
+            enable_drive_blender_cache=enable_drive_blender_cache,
         )
 
 
@@ -154,6 +162,14 @@ class BlenderRelease:
     archive_name: str
     archive_url: str
     checksum_url: str
+
+
+@dataclass(frozen=True)
+class BlenderArchiveAcquisition:
+    """A verified local archive and the cache outcome used to obtain it."""
+
+    archive_path: Path
+    cache_status: str
 
 
 def official_blender_release(version: str) -> BlenderRelease:
@@ -169,6 +185,14 @@ def official_blender_release(version: str) -> BlenderRelease:
         archive_url=f"{release_url}/{archive_name}",
         checksum_url=f"{release_url}/blender-{normalized_version}.sha256",
     )
+
+
+def _assert_official_blender_release(release: BlenderRelease) -> None:
+    """Reject descriptors that could redirect an installer to a third-party URL."""
+    if release != official_blender_release(release.version):
+        raise BlenderDownloadError(
+            "Blender archive URLs must come from download.blender.org."
+        )
 
 
 def sha256_file(path: Path) -> str:
@@ -579,13 +603,60 @@ def checksum_from_manifest(manifest: str, archive_name: str) -> str:
     )
 
 
+def official_blender_checksum(
+    release: BlenderRelease, *, opener: Callable[..., object] = urlopen
+) -> str:
+    """Fetch the expected SHA-256 only from Blender's official manifest."""
+    _assert_official_blender_release(release)
+    request = Request(
+        release.checksum_url, headers={"User-Agent": OFFICIAL_DOWNLOAD_USER_AGENT}
+    )
+    try:
+        with opener(request) as response:
+            manifest = response.read().decode("utf-8")
+        return checksum_from_manifest(manifest, release.archive_name)
+    except BlenderDownloadError:
+        raise
+    except Exception as error:
+        raise BlenderDownloadError(
+            f"Could not download the official Blender checksum manifest: {error}"
+        ) from error
+
+
+def _atomic_copy_verified_archive(
+    source: Path, destination: Path, expected_digest: str
+) -> Path:
+    """Copy a verified archive using a same-directory temporary file and replace."""
+    source = Path(source)
+    destination = Path(destination)
+    if not source.is_file():
+        raise BlenderCacheError(f"Blender archive does not exist: {source}")
+    if sha256_file(source) != expected_digest:
+        raise BlenderCacheError("Blender archive SHA-256 does not match the official manifest.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp", delete=False
+    ) as temporary:
+        temporary_path = Path(temporary.name)
+    try:
+        shutil.copyfile(source, temporary_path)
+        if sha256_file(temporary_path) != expected_digest:
+            raise BlenderCacheError("Blender archive changed while it was being copied.")
+        temporary_path.replace(destination)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return destination
+
+
 def download_verified_blender_archive(
     release: BlenderRelease,
     destination: Path,
     *,
     opener: Callable[..., object] = urlopen,
+    expected_digest: str | None = None,
 ) -> Path:
     """Download an official Blender archive and atomically retain it after SHA-256 verification."""
+    _assert_official_blender_release(release)
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -593,9 +664,7 @@ def download_verified_blender_archive(
         return opener(Request(url, headers={"User-Agent": OFFICIAL_DOWNLOAD_USER_AGENT}))
 
     try:
-        with open_official_url(release.checksum_url) as response:
-            manifest = response.read().decode("utf-8")
-        expected_digest = checksum_from_manifest(manifest, release.archive_name)
+        expected_digest = expected_digest or official_blender_checksum(release, opener=opener)
         with tempfile.NamedTemporaryFile(
             dir=destination.parent, prefix=f".{destination.name}.", delete=False
         ) as temporary:
@@ -614,6 +683,47 @@ def download_verified_blender_archive(
         raise
     except Exception as error:
         raise BlenderDownloadError(f"Could not download verified Blender archive: {error}") from error
+
+
+def acquire_verified_blender_archive(
+    release: BlenderRelease,
+    destination: Path,
+    *,
+    cache_path: Path | None = None,
+    opener: Callable[..., object] = urlopen,
+) -> BlenderArchiveAcquisition:
+    """Acquire a locally staged Blender archive from an opt-in verified cache.
+
+    A cache is only an optimization: its content is checked against a newly
+    fetched official SHA-256 manifest on every use.  A miss or mismatch falls
+    back to ``download.blender.org`` and only a verified local archive is
+    atomically copied back into the cache.
+    """
+    _assert_official_blender_release(release)
+    destination = Path(destination)
+    expected_digest = official_blender_checksum(release, opener=opener)
+    if cache_path is not None:
+        cache_path = Path(cache_path)
+        if not cache_path.exists():
+            cache_status = "miss"
+        else:
+            try:
+                _atomic_copy_verified_archive(cache_path, destination, expected_digest)
+                return BlenderArchiveAcquisition(destination, "hit")
+            except (BlenderCacheError, OSError):
+                cache_status = "corrupt"
+    else:
+        cache_status = "disabled"
+
+    download_verified_blender_archive(
+        release, destination, opener=opener, expected_digest=expected_digest
+    )
+    if cache_path is not None:
+        try:
+            _atomic_copy_verified_archive(destination, Path(cache_path), expected_digest)
+        except (BlenderCacheError, OSError):
+            cache_status = "write_failed"
+    return BlenderArchiveAcquisition(destination, cache_status)
 
 
 @dataclass(frozen=True)

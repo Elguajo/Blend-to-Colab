@@ -1,12 +1,15 @@
 import hashlib
 import io
+import json
 from pathlib import Path
 import tempfile
 import unittest
 
 from src.blend_to_colab import (
+    BlenderRelease,
     BlenderDownloadError,
     OFFICIAL_DOWNLOAD_USER_AGENT,
+    acquire_verified_blender_archive,
     checksum_from_manifest,
     download_verified_blender_archive,
     official_blender_release,
@@ -77,3 +80,130 @@ class BlenderVersioningTests(unittest.TestCase):
             with self.assertRaises(BlenderDownloadError):
                 download_verified_blender_archive(release, destination, opener=opener)
             self.assertFalse(destination.exists())
+
+    def test_verified_cache_hit_is_rechecked_against_official_checksum(self) -> None:
+        release = official_blender_release("5.2.1")
+        archive_bytes = b"verified cached Blender archive"
+        manifest = (
+            f"{hashlib.sha256(archive_bytes).hexdigest()}  {release.archive_name}\n"
+        ).encode()
+        opened_requests = []
+
+        def opener(request) -> io.BytesIO:
+            opened_requests.append(request.full_url)
+            return io.BytesIO(manifest)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache_path = root / "drive-cache" / release.archive_name
+            cache_path.parent.mkdir()
+            cache_path.write_bytes(archive_bytes)
+            acquired = acquire_verified_blender_archive(
+                release, root / "content" / release.archive_name,
+                cache_path=cache_path, opener=opener,
+            )
+
+            self.assertEqual(acquired.cache_status, "hit")
+            self.assertEqual(acquired.archive_path.read_bytes(), archive_bytes)
+            self.assertEqual(opened_requests, [release.checksum_url])
+
+    def test_cache_miss_downloads_from_official_source_then_publishes_cache(self) -> None:
+        release = official_blender_release("5.2.1")
+        archive_bytes = b"official Blender archive after cache miss"
+        manifest = (
+            f"{hashlib.sha256(archive_bytes).hexdigest()}  {release.archive_name}\n"
+        ).encode()
+        opened_requests = []
+
+        def opener(request) -> io.BytesIO:
+            opened_requests.append(request.full_url)
+            return io.BytesIO(
+                manifest if request.full_url == release.checksum_url else archive_bytes
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache_path = root / "drive-cache" / release.archive_name
+            acquired = acquire_verified_blender_archive(
+                release, root / "content" / release.archive_name,
+                cache_path=cache_path, opener=opener,
+            )
+
+            self.assertEqual(acquired.cache_status, "miss")
+            self.assertEqual(cache_path.read_bytes(), archive_bytes)
+            self.assertEqual(
+                opened_requests, [release.checksum_url, release.archive_url]
+            )
+
+    def test_corrupt_cache_falls_back_to_official_archive_and_replaces_cache(self) -> None:
+        release = official_blender_release("5.2.1")
+        archive_bytes = b"fresh official Blender archive"
+        manifest = (
+            f"{hashlib.sha256(archive_bytes).hexdigest()}  {release.archive_name}\n"
+        ).encode()
+        opened_requests = []
+
+        def opener(request) -> io.BytesIO:
+            opened_requests.append(request.full_url)
+            return io.BytesIO(
+                manifest if request.full_url == release.checksum_url else archive_bytes
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache_path = root / "drive-cache" / release.archive_name
+            cache_path.parent.mkdir()
+            cache_path.write_bytes(b"corrupted cache entry")
+            acquired = acquire_verified_blender_archive(
+                release, root / "content" / release.archive_name,
+                cache_path=cache_path, opener=opener,
+            )
+
+            self.assertEqual(acquired.cache_status, "corrupt")
+            self.assertEqual(acquired.archive_path.read_bytes(), archive_bytes)
+            self.assertEqual(cache_path.read_bytes(), archive_bytes)
+            self.assertEqual(opened_requests, [release.checksum_url, release.archive_url])
+
+    def test_rejects_non_official_release_descriptor_before_network_access(self) -> None:
+        release = official_blender_release("5.2.1")
+        untrusted_release = BlenderRelease(
+            version=release.version,
+            archive_name=release.archive_name,
+            archive_url="https://example.invalid/blender.tar.xz",
+            checksum_url="https://example.invalid/blender.sha256",
+        )
+        opened_requests = []
+
+        def opener(request) -> io.BytesIO:
+            opened_requests.append(request.full_url)
+            return io.BytesIO(b"")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(BlenderDownloadError):
+                acquire_verified_blender_archive(
+                    untrusted_release,
+                    Path(temporary) / "blender.tar.xz",
+                    opener=opener,
+                )
+        self.assertEqual(opened_requests, [])
+
+    def test_notebook_embeds_the_opt_in_local_staging_cache_flow(self) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        notebook = json.loads(
+            (repository_root / "render_blender_in_colab.ipynb").read_text(encoding="utf-8")
+        )
+        installer = next(
+            "".join(cell["source"])
+            for cell in notebook["cells"]
+            if "Установка Blender с официальной SHA-256 проверкой" in "".join(
+                cell.get("source", [])
+            )
+        )
+
+        compile(installer, "notebook Blender installer", "exec")
+        self.assertIn("CONFIG.enable_drive_blender_cache", installer)
+        self.assertIn("https://download.blender.org/release", installer)
+        self.assertIn("atomic_copy_verified_archive(cache_path, archive_path", installer)
+        self.assertIn("atomic_copy_verified_archive(archive_path, cache_path", installer)
+        self.assertIn("Path('/content/blender')", installer)
+        self.assertNotIn("shell=True", installer)
