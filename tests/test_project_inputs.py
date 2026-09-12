@@ -34,6 +34,14 @@ class ProjectInputTests(unittest.TestCase):
             with self.assertRaises(ProjectInputError):
                 validate_blend_file(path)
 
+    def test_accepts_zstandard_and_gzip_compressed_blend_containers(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, magic in (("zstandard.blend", b"\x28\xb5\x2f\xfd"), ("gzip.blend", b"\x1f\x8b")):
+                path = root / name
+                path.write_bytes(magic + b"x" * 16)
+                self.assertEqual(validate_blend_file(path), path)
+
     def test_multiple_blends_require_an_explicit_safe_selection(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

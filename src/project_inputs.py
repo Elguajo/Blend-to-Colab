@@ -8,6 +8,11 @@ from urllib.parse import urlsplit
 
 MAX_PROJECT_FILE_BYTES = 25 * 1024**3
 PROJECT_SOURCE_MODES = ("upload", "drive_file", "drive_folder", "url")
+BLEND_CONTAINER_MAGICS = (
+    b"BLENDER",  # Uncompressed blend-file.
+    b"\x28\xb5\x2f\xfd",  # Zstandard, used by Blender 3.0 and later.
+    b"\x1f\x8b",  # Gzip, used by earlier compressed blend-files.
+)
 
 
 class ProjectInputError(ValueError):
@@ -69,8 +74,9 @@ def validate_blend_file(path: Path, *, max_bytes: int = MAX_PROJECT_FILE_BYTES) 
     if not 12 <= size <= max_bytes:
         raise ProjectInputError("Project .blend size is outside the allowed limit.")
     with candidate.open("rb") as source:
-        if source.read(7) != b"BLENDER":
-            raise ProjectInputError("Project .blend does not have a Blender file header.")
+        container_magic = source.read(7)
+        if not any(container_magic.startswith(magic) for magic in BLEND_CONTAINER_MAGICS):
+            raise ProjectInputError("Project .blend does not have a supported Blender container header.")
     return candidate
 
 
