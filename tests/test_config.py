@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 import unittest
 
 from src.blend_to_colab import (
@@ -11,6 +13,21 @@ from src.blend_to_colab import (
 
 
 class RenderConfigTests(unittest.TestCase):
+    def test_notebook_defaults_to_verified_gpu_without_cpu_fallback(self) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        notebook = json.loads(
+            (repository_root / "render_blender_in_colab.ipynb").read_text(encoding="utf-8")
+        )
+        cells = ["".join(cell.get("source", [])) for cell in notebook["cells"]]
+        primary_settings = next(cell for cell in cells if "ENABLE_CYCLES_GPU" in cell)
+        advanced_settings = next(
+            cell for cell in cells if "#@title Настройки — Advanced" in cell
+        )
+
+        self.assertIn("ENABLE_CYCLES_GPU = True", primary_settings)
+        self.assertIn("ALLOW_CPU_FALLBACK = False", advanced_settings)
+        self.assertIn("RUN_CYCLES_SMOKE_TEST = True", advanced_settings)
+
     def test_default_lts_preset_builds_typed_config(self) -> None:
         config = RenderConfig.from_user_values(
             blender_version_preset=DEFAULT_BLENDER_VERSION,

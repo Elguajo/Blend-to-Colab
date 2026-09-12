@@ -49,7 +49,7 @@
 | `RENDER_MODE` | `'ANIMATION'` — весь диапазон кадров; `'STILL'` — один кадр. | `'ANIMATION'` |
 | `STILL_FRAME` | Номер кадра при `RENDER_MODE = 'STILL'`. | `1` |
 | `DOWNLOAD_RESULT` | Дополнительно скачать готовый файл или ZIP на компьютер. | `False` |
-| `RUN_CYCLES_SMOKE_TEST` | Выполнить отдельный реальный Cycles GPU smoke test до загрузки проекта. | `False` |
+| `RUN_CYCLES_SMOKE_TEST` | Выполнить отдельный реальный Cycles GPU smoke test до загрузки проекта. | `True` |
 | `RUN_PREFLIGHT_TEST_FRAME` | После preflight отрендерить один кадр для линейной оценки времени и места. | `False` |
 | `ENABLE_DRIVE_BLENDER_CACHE` | Opt-in постоянный кэш только проверенного архива Blender в Google Drive. | `False` |
 
@@ -110,7 +110,7 @@ FFMPEG/video output блокируется, потому что отдельны
 
 Для Cycles рекомендуется включить GPU в настройках среды Colab. Ноутбук по очереди проверяет OptiX и CUDA через сам Blender/Cycles, включает только устройства выбранного backend и печатает их имена. Если Cycles-сцена не получила подтверждённый GPU, запуск останавливается по умолчанию: CPU fallback возможен только при явном `ALLOW_CPU_FALLBACK = True`.
 
-Чтобы проверить реальный runtime до загрузки проекта, установите `RUN_CYCLES_SMOKE_TEST = True` и выполните ячейку 2.1 в GPU-среде Colab. Она рендерит отдельную временную сцену Cycles 64×64 и сохраняет `/content/cycles_gpu_smoke_test.log` с маркером `CYCLES_SMOKE_TEST_PASS backend=...`; исходный `.blend` при этом не открывается.
+Перед загрузкой проекта notebook по умолчанию выполняет отдельный Cycles GPU smoke test 64×64. В GPU-среде он сохраняет `/content/cycles_gpu_smoke_test.log` с маркером `CYCLES_SMOKE_TEST_PASS backend=...`; исходный `.blend` при этом не открывается. Если GPU не выделена, smoke завершится ошибкой до загрузки и рендера проекта; включите `Runtime → Change runtime type → GPU`, а не разрешайте CPU fallback.
 
 Для Eevee отдельная настройка `ENABLE_CYCLES_GPU` не требуется.
 
