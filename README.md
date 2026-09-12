@@ -72,6 +72,21 @@ DRIVE_OUTPUT_DIR = Path('/content/drive/MyDrive/Blender Renders')
 
 Это предотвращает перезапись рендеров из предыдущих запусков. Если `DOWNLOAD_RESULT = True`, один готовый файл будет скачан напрямую, а несколько файлов — упакованы в ZIP-архив.
 
+### Возобновление animation job
+
+В render-ячейке notebook создаётся protocol v1 job с UUID и папкой
+`<DRIVE_OUTPUT_DIR>/jobs/<job-id>/`. В ней остаются неизменяемый `job.json`,
+монотонный `worker/status.json`, streaming `worker/render.log`, итоговый
+`worker/summary.json` и `result/result_manifest.json` с SHA-256 каждого кадра.
+
+После обрыва runtime повторно загрузите тот же `.blend`, пройдите preflight и
+в render-ячейке укажите напечатанный ранее `JOB_ID`. Notebook сверит fingerprint
+проекта и сохранённый диапазон кадров, повторно проверит checksum уже готовых
+кадров и отрендерит только missing или повреждённые кадры. Новый пустой `JOB_ID`
+создаёт отдельный job. Для resumable animation нужен image sequence; прямой
+FFMPEG/video output блокируется, потому что отдельные кадры нельзя надёжно
+подтвердить и продолжить.
+
 ## GPU и Cycles
 
 Для Cycles рекомендуется включить GPU в настройках среды Colab. Ноутбук по очереди проверяет OptiX и CUDA через сам Blender/Cycles, включает только устройства выбранного backend и печатает их имена. Если Cycles-сцена не получила подтверждённый GPU, запуск останавливается по умолчанию: CPU fallback возможен только при явном `ALLOW_CPU_FALLBACK = True`.

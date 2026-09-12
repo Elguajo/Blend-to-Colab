@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blend-to-colab.example/protocol/1.0/job.schema.json",
+  "title": "Blend-to-Colab job request",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["protocol_version", "job_id", "created_at", "addon_version", "project", "blender", "render", "destination"],
+  "properties": {
+    "protocol_version": {"const": "1.0"},
+    "job_id": {"type": "string", "format": "uuid"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "addon_version": {"type": "string", "minLength": 1},
+    "project": {"$ref": "#/$defs/project"},
+    "blender": {"$ref": "#/$defs/blender"},
+    "render": {"$ref": "#/$defs/render"},
+    "destination": {"$ref": "#/$defs/destination"}
+  },
+  "$defs": {
+    "project": {"type": "object", "required": ["display_name", "archive", "sha256", "size_bytes"], "properties": {"display_name": {"type": "string", "minLength": 1}, "archive": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "size_bytes": {"type": "integer", "minimum": 0}}},
+    "blender": {"type": "object", "required": ["source_version", "requested_version"], "properties": {"source_version": {"type": "string", "minLength": 1}, "requested_version": {"type": "string", "minLength": 1}}},
+    "render": {"type": "object", "required": ["mode", "start", "end", "step", "overwrite", "use_saved_settings", "overrides"], "properties": {"mode": {"enum": ["saved_range", "single_frame"]}, "start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 0}, "step": {"type": "integer", "minimum": 1}, "overwrite": {"type": "boolean"}, "use_saved_settings": {"type": "boolean"}, "overrides": {"type": "object"}}},
+    "destination": {"type": "object", "required": ["mode"], "properties": {"mode": {"enum": ["local", "manual_zip", "synced_folder"]}}}
+  }
+}

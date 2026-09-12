@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blend-to-colab.example/protocol/1.0/result_manifest.schema.json",
+  "title": "Blend-to-Colab result manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["protocol_version", "job_id", "published_at", "state", "artifacts"],
+  "properties": {
+    "protocol_version": {"const": "1.0"}, "job_id": {"type": "string", "format": "uuid"}, "published_at": {"type": "string", "format": "date-time"}, "state": {"enum": ["PARTIAL", "COMPLETE"]}, "artifacts": {"type": "array", "items": {"type": "object", "required": ["frame", "path", "sha256", "size_bytes"], "properties": {"frame": {"type": "integer", "minimum": 0}, "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"}, "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}, "size_bytes": {"type": "integer", "minimum": 0}}}}
+  }
+}

@@ -521,9 +521,24 @@ Preflight и запуск рендера должны оставаться ра�
 
 Не выполнено:
 
-- запуск текущего или сторонних notebook в Google Colab;
-- реальный Cycles/EEVEE render smoke test;
-- проверка Google Drive OAuth и больших файлов;
+- проверка больших файлов;
 - сравнительный benchmark GPU.
+
+Реально подтверждено в Google Colab T4 после аудита:
+
+- Cycles GPU smoke test на Blender 5.2.1: `OPTIX` на `Tesla T4`;
+- Drive OAuth и сохранение промежуточных/итоговых результатов;
+- interrupted-animation для job `2e839139-d767-4d74-b873-dd4f2870318b`: после явного `Disconnect and delete runtime` чистая среда не содержала прежних Blender, source или staging-файлов, но восстановила job из Drive;
+- missing-only resume: проверенные кадры 1–2 сохранены, отрендерены только кадры 3–4, SHA-256 исходного `.blend` не изменился;
+- независимая проверка Drive: все кадры 1–4 существуют, совпадают по size/SHA-256, manifest/status/summary имеют `COMPLETE`, status revision равна 3.
+
+Локально реализовано после аудита (Этап 3):
+
+- protocol v1 с JSON Schemas для request, worker status и result manifest;
+- immutable `job.json`, UUID v4, монотонная revision и recovery-переходы;
+- chunked missing-only plan, atomic publication кадров/manifest/status, SHA-256 и streaming log/summary;
+- unit/integration simulation interruption, resume и corruption repair.
+
+Resume-поток подтверждён end-to-end для короткой временной Cycles-анимации; это не заменяет smoke matrix для крупных проектов, других движков и вариантов хранения.
 
 Эти ограничения запрещают утверждать, что текущий notebook или любой сторонний notebook полностью работает в актуальном Colab только на основании статического аудита.
