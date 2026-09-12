@@ -555,6 +555,7 @@ class ResumableJobRunner:
         )
         if not chunks:
             manifest = self.store.publish_manifest(valid.values(), complete=True)
+            self.store.publish_status(JobState.RENDERING, completed_frames=len(all_frames), total_frames=len(all_frames), message="Verified frames need no new render process.", worker_version=self.worker_version, device=device)
             self.store.publish_status(JobState.COMPLETE, completed_frames=len(all_frames), total_frames=len(all_frames), message="All frames already verified.", worker_version=self.worker_version, device=device)
             self.store.publish_summary(state=JobState.COMPLETE, verified_frames=len(all_frames), total_frames=len(all_frames))
             self.store.append_log("JOB_COMPLETE reused_verified_frames=true")

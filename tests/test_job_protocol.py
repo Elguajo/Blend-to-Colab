@@ -132,6 +132,31 @@ class JobProtocolTests(unittest.TestCase):
             self.assertEqual(manifest["state"], "COMPLETE")
             self.assertEqual(sorted(store.valid_artifacts()), [1, 2])
 
+    def test_resume_with_all_verified_frames_after_partial_does_not_render_again(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            store = self._job(Path(temporary), end=2)
+            initial_calls: list[tuple[int, ...]] = []
+            ResumableJobRunner(store, worker_version="test", chunk_size=2).run(self._renderer(initial_calls))
+            store.publish_status(
+                JobState.PREFLIGHT, completed_frames=2, total_frames=2, message="audit", worker_version="test"
+            )
+            store.publish_status(
+                JobState.RENDERING, completed_frames=2, total_frames=2, message="recovery", worker_version="test"
+            )
+            store.publish_status(
+                JobState.PARTIAL, completed_frames=2, total_frames=2, message="interrupted", worker_version="test"
+            )
+
+            resumed_calls: list[tuple[int, ...]] = []
+            manifest = ResumableJobRunner(store, worker_version="test", chunk_size=2).run(
+                self._renderer(resumed_calls)
+            )
+
+            self.assertEqual(resumed_calls, [])
+            self.assertEqual(manifest["state"], "COMPLETE")
+            self.assertEqual(store.status()["state"], "COMPLETE")
+            self.assertIn("JOB_COMPLETE reused_verified_frames=true", store.paths.log_path.read_text(encoding="utf-8"))
+
     def test_rejects_non_uuid_and_unsafe_result_path(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             store = self._job(Path(temporary), end=1)
@@ -166,4 +191,5 @@ class JobProtocolTests(unittest.TestCase):
         self.assertIn("JOB_ID", cell_source)
         self.assertIn("result_manifest.json", cell_source)
         self.assertIn("subprocess.Popen", cell_source)
+        self.assertIn("reuse_complete = not chunks", cell_source)
         self.assertNotIn("shell=True", cell_source)
