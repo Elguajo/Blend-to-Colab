@@ -1,6 +1,6 @@
 # ROADMAP — Blend-to-Colab
 
-Статус на 2026-09-12: Этапы 1 и 2 завершены. Локальные unit/static checks и реальные Colab smoke tests подтверждены.
+Статус на 2026-09-12: Этапы 1–4 завершены. Локальные unit/static checks и реальные Colab smoke tests подтверждены.
 
 Связанные документы:
 
@@ -73,14 +73,14 @@
 
 ## Этап 4 — источники проектов и выдача результатов
 
-- [ ] Поддержать local upload и ручной ZIP без Google Drive.
-- [ ] Поддержать Google Drive file/folder и HTTPS URL.
-- [ ] При нескольких `.blend` требовать явный выбор.
-- [ ] Валидировать remote input до распаковки и использования.
-- [ ] Добавить result ZIP, preview и опциональную сборку MP4.
-- [ ] Проверить пути с пробелами, Unicode и специальными символами.
-- [ ] Убедиться, что пользовательские строки не интерполируются в shell commands.
-- [ ] Провести smoke test каждого source/destination варианта.
+- [x] Поддержать local upload и ручной ZIP без Google Drive.
+- [x] Поддержать Google Drive file/folder и HTTPS URL.
+- [x] При нескольких `.blend` требовать явный выбор.
+- [x] Валидировать remote input до распаковки и использования.
+- [x] Добавить result ZIP, preview и опциональную сборку MP4.
+- [x] Проверить пути с пробелами, Unicode и специальными символами.
+- [x] Убедиться, что пользовательские строки не интерполируются в shell commands.
+- [x] Провести smoke test каждого source/destination варианта.
 
 Риск-гейт: неподтверждённые архивы и удалённые данные не должны попадать в исполняемые команды или выходить за staging directory.
 
@@ -189,3 +189,5 @@
 ## Текущий статус
 
 Этапы 0–3 завершены. Этап 1 подтверждён локальными проверками и реальным Colab GPU smoke test: Blender 5.2.1 LTS выбрал OptiX на `Tesla T4 (OPTIX)` и завершил рендер временной сцены с маркером `CYCLES_SMOKE_TEST_PASS`. Этап 2 подтверждён реальным Colab T4 smoke test: stock Blender 5.2.1 сохранил SHA-256 двух временных `.blend` до и после probe, обнаружил `missing_asset` до рендера и отрендерил opt-in test-frame за 1.33 с; Cycles обнаружил CUDA и OptiX для Tesla T4. Этап 3 подтверждён реальным прерыванием и удалением runtime Colab: job `2e839139-d767-4d74-b873-dd4f2870318b` сохранил проверенные кадры 1–2 в Drive, в новой чистой T4-среде отрендерил только 3–4 через `OPTIX`, не изменив SHA-256 исходного `.blend`; независимая проверка Drive подтвердила кадры 1–4, `COMPLETE` и revision 3.
+
+Этап 4 закрыт 2026-09-12 по явному решению владельца проекта на основании совокупности реального Colab evidence: cache miss/hit и fallback после повреждённого Drive archive, Drive file/folder с явным вложенным выбором, HTTPS, browser upload, preflight, двухкадровый Drive render/resume, а также local delivery с preview, result ZIP, MP4 и Unicode/special-character paths. В последнем local-delivery прогоне browser `files.upload()` ZIP chooser не был повторно завершён автоматизацией; это ограничение наблюдения зафиксировано в `COLAB_STAGE4_LOCAL_DELIVERY_UNICODE_SMOKE_2026-09-12.md` и не изменяет решение о закрытии.

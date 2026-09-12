@@ -7,6 +7,16 @@ paths. It does not claim browser upload of a ZIP: the `files.upload()` chooser
 did not expose a usable upload event to the automation interface and was
 cancelled before a file was selected.
 
+## Closure decision
+
+On 2026-09-12 the project owner explicitly accepted the accumulated real-Colab
+evidence for Stage 4 and authorised the stage to be counted as complete. That
+decision includes the previously recorded Drive cache, source, and default-GPU
+smokes together with the observed local-delivery run in this record.
+
+This authorisation does not turn the cancelled browser `files.upload()` attempt
+in this run into a direct observation of a browser ZIP handoff.
+
 ## Environment and configuration
 
 - Google Colab connected GPU runtime: T4 (Python 3).
@@ -83,6 +93,7 @@ The final runtime verification asserted all of the following:
 
 - The result path, ZIP, preview, MP4 assembly, download, non-CPU Cycles render,
   and Unicode/special-character source path above are observed facts.
-- This is not evidence of a completed browser `files.upload()` ZIP handoff. The
-  manual ZIP smoke remains open, so this record does not satisfy the Stage 4
-  exit criterion by itself and no roadmap checkbox was changed.
+- This is not a direct observation of a completed browser `files.upload()` ZIP
+  handoff in this run. Stage 4 is marked complete only under the explicit
+  project-owner decision recorded above; this limitation remains relevant when
+  reproducing that browser interaction.
